@@ -1,0 +1,21 @@
+{
+  "name": "redlight-server",
+  "version": "0.0.0",
+  "description": "redlight-server",
+  "main": "app.js",
+  "author": {
+    "name": "Sergey",
+    "email": ""
+  },
+  "dependencies": {
+    "express": "^4.12.2",
+    "extend": "^2.0.0",
+    "intel": "^1.0.0",
+    "mdns": "^2.2.8",
+    "minimist": "^1.1.1",
+    "pem": "^1.7.1",
+    "rx": "^2.4.1",
+    "uuid": "^2.0.1",
+    "xmlbuilder": "^2.6.2"
+  }
+}
