@@ -26,3 +26,9 @@ node_modules
 
 # Users Environment Variables
 .lock-wscript
+
+keys
+.ntvs_analysis.dat
+obj
+bin
+*.njsproj
