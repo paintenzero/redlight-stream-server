@@ -3,12 +3,22 @@ var path = require('path');
 var Rx = require('rx');
 var pem = require('pem');
 var logger = require('intel').getLogger('Redlight.Crypto');
+var storage = require('./storage');
 
 pem.config({
     pathOpenSSL: __dirname + path.sep + 'openssl' + path.sep + 'openssl.exe'
 });
 process.env['OPENSSL_CONF'] = __dirname + path.sep + 'openssl' + path.sep + 'openssl.cnf';
 
+/**
+ * Returns server's unique id
+ */ 
+module.exports.getServerId = function () {
+    return storage.settingsObservable().
+    map(function (row) {
+        return row.serverId;
+    });
+};
 /**
  * Returns promise for HTTPS credentials
  */ 

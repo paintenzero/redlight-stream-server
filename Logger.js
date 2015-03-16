@@ -22,6 +22,8 @@ intel.config({
         "Redlight.Crypto": {
         },
         "Redlight.HTTP": {
+        },
+        "Redlight.SQLite": {
         }
     }
 });

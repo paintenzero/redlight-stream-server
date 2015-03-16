@@ -47,9 +47,13 @@ function createExpress() {
         res.end();
     });
     app.get('/serverinfo', serverInfo);
+    app.get('/pair', pairApp);
     return app;
 }
 
+/**
+ * Request to get server's information
+ */ 
 function serverInfo(req, res) {
     logger.debug('serverinfo requested');
     //var clientId = req.query.uniqueid;
@@ -57,14 +61,31 @@ function serverInfo(req, res) {
         '@query': 'serverinfo',
         '@status_code': 200,
         '@status_message': 'OK'
-    });
-    res.set({
-        'Content-Type': 'text/xml; charset=utf-8',
-        'Content-Length': resp.length
-    });
-    logger.debug('serverinfo response', resp);
-    res.write(resp);
-    res.end();
+    }).subscribe(xmlRequestObserver(req, res));
+}
+function pairApp(req, res) {
+    logger.debug('pairing request: ' + JSON.stringify(req.query));
+    res.status(500).end();
+}
+/**
+ * Observer for sending XML to HTTP response
+ */
+function xmlRequestObserver(req, res) {
+    return Rx.Observer.create(
+        function (xml) {
+            res.set({
+                'Content-Type': 'text/xml; charset=utf-8',
+                'Content-Length': xml.length
+            });
+            res.write(xml);
+        },
+        function (err) {
+            res.status(500).end();
+        },
+        function () {
+            res.end();
+        }
+    );
 }
 
 /**
@@ -72,23 +93,4 @@ function serverInfo(req, res) {
  */ 
 module.exports.httpsObservable = function () {
     return createHTTPSObservable();
-    /*if (httpsListening) return Rx.Observable.return(true);
-
-    
-
-    var httpsSrvObservable = null;
-    if (httpsSrv === null) { // If HTTPS server was not created, create it
-        httpsSrvObservable = .
-        map(function (credentials) {
-            httpsSrv = 
-            return httpsSrv;
-        });
-    } else {
-        httpsSrvObservable = Rx.Observable.return(httpsSrv);
-    }
-    return httpsSrvObservable.flatMap(function (srv) {
-        logger.debug('Start listening HTTPS port', port);
-        //srv.listen(port, function (arg0) { console.log(arg0); });
-        return Rx.Observable.fromCallback(srv.listen)(port);
-    });*/
 };

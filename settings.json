@@ -1,5 +1,6 @@
 ﻿{
-    "server": { 
+    "dbVer":  1,
+    "server": {
         "https-port": 47984
     }
 }
