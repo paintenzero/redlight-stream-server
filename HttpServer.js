@@ -5,6 +5,9 @@ var config = require('./config');
 var logger = require('intel').getLogger('Redlight.HTTP');
 var express = require('express');
 var discoveryMan = require('./DiscoveryManager.js');
+var PinRequester = require('./PinRequester.js');
+var PairingManager = require('./PairingManager.js');
+var storage = require('./storage');
 /**
  * Creates observable for HTTPS server
  */ 
@@ -30,16 +33,16 @@ function createHTTPSObservable() {
                 });
             },
             observer.onError
-        ));
-        
-        
+        ));        
         return function () {
             logger.debug('HTTPS dispose called');
             srv.close();
         };
     });
 }
-
+/**
+ * 
+ */ 
 function createExpress() {
     var app = express();
     app.get('/', function (req, res) {
@@ -48,24 +51,129 @@ function createExpress() {
     });
     app.get('/serverinfo', serverInfo);
     app.get('/pair', pairApp);
+    app.get('/unpair', unpairApp)
     return app;
 }
-
 /**
  * Request to get server's information
  */ 
 function serverInfo(req, res) {
     logger.debug('serverinfo requested');
-    //var clientId = req.query.uniqueid;
-    var resp = discoveryMan.computerInfoXML({
-        '@query': 'serverinfo',
-        '@status_code': 200,
-        '@status_message': 'OK'
-    }).subscribe(xmlRequestObserver(req, res));
+    discoveryMan.computerInfoXML(createXMLRootElement('serverinfo', 200)).subscribe(xmlRequestObserver(req, res));
 }
+/**
+ * Request to pair server with client device
+ */ 
 function pairApp(req, res) {
     logger.debug('pairing request: ' + JSON.stringify(req.query));
-    res.status(500).end();
+    if (req.query.uniqueid) {
+        var deviceId = req.query.uniqueid;
+        if (req.query.phrase) {
+            if (req.query.phrase === 'getservercert') {
+                return getServerCert(req, res, deviceId);
+            } else if (req.query.phrase === 'pairchallenge') {
+                return pairChallenge(req, res, deviceId);
+            }
+        } else if (req.query.clientchallenge) {
+            return clientChallenge(req, res, deviceId);
+        } else if (req.query.serverchallengeresp) {
+            return serverChallengeResponse(req, res, deviceId);
+        } else if (req.query.clientpairingsecret) {
+            return clientPairingSecret(req, res, deviceId);
+        }
+    }
+    res.status(400).end();
+}
+/**
+ * Pairing request: getServerCert
+ */ 
+function getServerCert(req, res, deviceId) {
+    var salt = CryptoManager.hex2Buffer(req.query.salt);
+    var clientcert = CryptoManager.hex2Buffer(req.query.clientcert);
+    var devicename = req.query.devicename;
+    PinRequester.getPin().
+    flatMap(function (pin) { // Create full key from salt + pin and save it to database
+        var saltAndPin = PairingManager.createSaltAndPin(salt, pin);
+        return storage.saveDevice(deviceId, devicename, clientcert, saltAndPin);
+    }).
+    flatMap(function () {
+        return PairingManager.certificateResponseXML(createXMLRootElement('pair', 200));
+    }).
+    subscribe(xmlRequestObserver(req, res));
+}
+/**
+ * Pairing request: client challenge
+ */ 
+function clientChallenge(req, res, deviceId) {
+    CryptoManager.deviceDecrypt(deviceId, CryptoManager.hex2Buffer(req.query.clientchallenge)).
+    flatMap(function (decryptedChallenge) {
+        return storage.updateDeviceData(deviceId, { "clientChallenge": CryptoManager.buffer2hex(decryptedChallenge) }).
+        map(function (_) { return decryptedChallenge; });
+    }).
+    flatMap(function (decryptedChallengeBuffer) {
+        return PairingManager.clientChallengeResponseXML(createXMLRootElement('pair', 200), deviceId, decryptedChallengeBuffer);
+    }).
+    subscribe(xmlRequestObserver(req, res));
+}
+/**
+ * Pairing request: server challenge response
+ */ 
+function serverChallengeResponse(req, res, deviceId) {
+    return storage.updateDeviceData(deviceId, { "clientSecretHash": req.query.serverchallengeresp }).
+    flatMap(function () {
+        return PairingManager.serverChallengeResponseXML(createXMLRootElement('pair', 200), deviceId);
+    }).
+    subscribe(xmlRequestObserver(req, res));
+}
+/**
+ * Request for client's pairing secret
+ */ 
+function clientPairingSecret(req, res, deviceId) {
+    var clientPairingSecret = CryptoManager.hex2Buffer(req.query.clientpairingsecret);
+    var clientSecret = clientPairingSecret.slice(0, 16);
+    var clientSecretSignature = clientPairingSecret.slice(16, 272);
+    return storage.getDevice(deviceId).
+    map(function (device) {
+        return CryptoManager.verifySignature(clientSecretSignature, clientSecret, device.certificate);
+    }).
+    map(function (checkResult) {
+        if (checkResult) {
+            return PairingManager.createXML(createXMLRootElement('pair', 200), {});
+        } else {
+            logger.error('Client secret signature verification failed');
+            return PairingManager.createXML(createXMLRootElement('pair', 200), {'paired': 0});
+        }
+    }).
+    subscribe(xmlRequestObserver(req, res));
+}
+/**
+ * Last pair challenge
+ */ 
+function pairChallenge(req, res, deviceId) {
+    storage.getDevice(deviceId).
+    map(function (device) {
+        //TODO: check device pairing here
+        return PairingManager.createXML(createXMLRootElement('pair', 200), {});
+    }).
+    subscribe(xmlRequestObserver(req, res));
+}
+/**
+ * Unpairing requst
+ */ 
+function unpairApp(req, res) {
+    logger.debug('pairing request: ' + JSON.stringify(req.query));
+    var deviceid = req.query.uniqueid;
+    storage.removeDevice(deviceid).subscribe(Rx.Observer.create(
+        function () {
+            //TODO: what to send here?
+            res.status(200).end();
+        },
+        function (err) {
+            logger.error("Unpairing failed: %s", err.message);
+            res.status(500).end();
+        }
+    ));
+    
 }
 /**
  * Observer for sending XML to HTTP response
@@ -80,6 +188,7 @@ function xmlRequestObserver(req, res) {
             res.write(xml);
         },
         function (err) {
+            logger.error("Request %s error: %s", req.path, err.message, err.stack);
             res.status(500).end();
         },
         function () {
@@ -87,10 +196,34 @@ function xmlRequestObserver(req, res) {
         }
     );
 }
-
 /**
- * 
+ * Creates HTTP server observable with start / stop / errors signals
  */ 
 module.exports.httpsObservable = function () {
     return createHTTPSObservable();
 };
+
+function createXMLRootElement(query, status) {
+    var RootElement = {
+        '@protocol_version': 0.1,
+        '@query': query,
+        '@status_code': status,
+        '@status_message': 'OK'
+    };
+    return RootElement;
+}
+
+//var encrypted = '17B27295DEB7208860EA6D895FEC3214';
+/*CryptoManager.deviceEncrypt("b102044d99618254", CryptoManager.hex2Buffer('36D5503A16CA5D5C1574B109D784E92D')).
+subscribe(Rx.Observer.create(
+    function (encrypted) {
+        console.log('encrypted:', encrypted);
+    },
+    function (err) {
+        console.log('ERROR', err);
+    },
+    function () {
+        console.log('completed');
+    }
+));*/
+

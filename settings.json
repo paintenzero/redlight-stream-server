@@ -1,6 +1,11 @@
 ﻿{
-    "dbVer":  1,
+    "dbVer": 1,
     "server": {
-        "https-port": 47984
+        "https-port": 47984,
+        "key-dir":  "keys"
+    },
+    "pin": {
+        "port": 47800,
+        "bin": "./redlight-server-pin.exe"
     }
 }

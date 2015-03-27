@@ -23,6 +23,9 @@ intel.config({
         },
         "Redlight.HTTP": {
         },
+        "Redlight.Pairing": {
+            "level": "ERROR"
+        },
         "Redlight.SQLite": {
         }
     }
