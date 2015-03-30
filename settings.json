@@ -2,10 +2,14 @@
     "dbVer": 1,
     "server": {
         "https-port": 47984,
-        "key-dir":  "keys"
+        "key-dir": "keys"
     },
     "pin": {
         "port": 47800,
         "bin": "./redlight-server-pin.exe"
+    },
+    "gamestream": {
+        "appversion": "4.0.1000.0",
+        "ServerCapability": 23
     }
 }

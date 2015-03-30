@@ -91,7 +91,8 @@ function getServerCert(req, res, deviceId) {
     var salt = CryptoManager.hex2Buffer(req.query.salt);
     var clientcert = CryptoManager.hex2Buffer(req.query.clientcert);
     var devicename = req.query.devicename;
-    PinRequester.getPin().
+    
+    var subscription = PinRequester.getPin().
     flatMap(function (pin) { // Create full key from salt + pin and save it to database
         var saltAndPin = PairingManager.createSaltAndPin(salt, pin);
         return storage.saveDevice(deviceId, devicename, clientcert, saltAndPin);
@@ -100,6 +101,10 @@ function getServerCert(req, res, deviceId) {
         return PairingManager.certificateResponseXML(createXMLRootElement('pair', 200));
     }).
     subscribe(xmlRequestObserver(req, res));
+
+    req.on('close', function () {
+        subscription.dispose();
+    });
 }
 /**
  * Pairing request: client challenge
@@ -136,6 +141,9 @@ function clientPairingSecret(req, res, deviceId) {
     map(function (device) {
         return CryptoManager.verifySignature(clientSecretSignature, clientSecret, device.certificate);
     }).
+    flatMap(function (checkResult) {
+        return PairingManager.setPairedStatus(deviceId, checkResult);
+    }).
     map(function (checkResult) {
         if (checkResult) {
             return PairingManager.createXML(createXMLRootElement('pair', 200), {});
@@ -151,9 +159,12 @@ function clientPairingSecret(req, res, deviceId) {
  */ 
 function pairChallenge(req, res, deviceId) {
     storage.getDevice(deviceId).
-    map(function (device) {
-        //TODO: check device pairing here
-        return PairingManager.createXML(createXMLRootElement('pair', 200), {});
+    flatMap(function (device) {
+        PairingManager.getDevicePairedStatus(deviceId)
+    }).
+    map(function (isPaired) {
+        var obj = { 'paired': isPaired ? 1 : 0 };
+        return PairingManager.createXML(createXMLRootElement('pair', 200), obj);
     }).
     subscribe(xmlRequestObserver(req, res));
 }
@@ -161,19 +172,14 @@ function pairChallenge(req, res, deviceId) {
  * Unpairing requst
  */ 
 function unpairApp(req, res) {
+    //TODO: check what GFE server sends here
     logger.debug('pairing request: ' + JSON.stringify(req.query));
     var deviceid = req.query.uniqueid;
-    storage.removeDevice(deviceid).subscribe(Rx.Observer.create(
-        function () {
-            //TODO: what to send here?
-            res.status(200).end();
-        },
-        function (err) {
-            logger.error("Unpairing failed: %s", err.message);
-            res.status(500).end();
-        }
-    ));
-    
+    storage.removeDevice(deviceid).
+    map(function (_) {
+        return PairingManager.createXML(createXMLRootElement('pair', 200), { 'paired': 0 });
+    }).
+    subscribe(xmlRequestObserver(req, res));
 }
 /**
  * Observer for sending XML to HTTP response
@@ -212,18 +218,3 @@ function createXMLRootElement(query, status) {
     };
     return RootElement;
 }
-
-//var encrypted = '17B27295DEB7208860EA6D895FEC3214';
-/*CryptoManager.deviceEncrypt("b102044d99618254", CryptoManager.hex2Buffer('36D5503A16CA5D5C1574B109D784E92D')).
-subscribe(Rx.Observer.create(
-    function (encrypted) {
-        console.log('encrypted:', encrypted);
-    },
-    function (err) {
-        console.log('ERROR', err);
-    },
-    function () {
-        console.log('completed');
-    }
-));*/
-

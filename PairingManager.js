@@ -92,3 +92,18 @@ function createXML(RootElement, data) {
     return RootElement.end({ pretty: false });
 }
 module.exports.createXML = createXML;
+/**
+ * Returns observable for device paired status
+ */ 
+module.exports.getDevicePairedStatus = function (deviceId) {
+    return storage.getDevice(deviceId).map(function (row) {
+        if (!row) return false;
+        return !!row.paired;
+    });
+};
+/**
+ * Sets device paired status
+ */ 
+module.exports.setDevicePairedStatus = function (deviceId, status) {
+    return storage.setDevicePaired(deviceId, status).map(function (_) { return status; });
+};
