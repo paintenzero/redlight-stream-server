@@ -1,9 +1,9 @@
-﻿var Winreg = require('winreg');
-var Rx = require('rx');
+﻿var Rx = require('rx');
 var logger = require('intel').getLogger('Redlight.GamesList');
 var crypto = require('crypto');
 var extend = require('extend');
 var path = require('path');
+var Platform = require('./Platform');
 
 var inited = false;
 var GamesList = [];
@@ -44,8 +44,8 @@ module.exports.__defineGetter__('list', function () { return GamesList; });
 function getGamesList() {
     //Search for common apps
     return Rx.Observable.merge(
-        findGameInRegistry('Steam', Winreg.HKCU, '\\Software\\Valve\\Steam\\SteamExe', 'Steam'),
-        findGameInRegistry('WarThunder', Winreg.HKCU, '\\Software\\Gaijin\\WarThunder\\Path', 'Gaijin')
+        findGameInRegistry('Steam', Platform.REGISTRY_HIVE.HKCU + '\\Software\\Valve\\Steam\\SteamExe', 'Steam'),
+        findGameInRegistry('WarThunder', Platform.REGISTRY_HIVE.HKCU + '\\Software\\Gaijin\\WarThunder\\Path', 'Gaijin')
     ).map(function (game) {
         var newGame = {};
         extend(false, newGame, game);
@@ -63,27 +63,16 @@ function stringToDigits(str) {
     return parseInt(hash.digest('hex'), 16) % Math.pow(10, 8);
 }
 /**
- * Returns observable for registry key value
- */
-function regKeyObservable(hive, key, def) {
-    var keyArr = key.split('\\');
-    var itemName = keyArr.splice(-1);
-    
-    var regKey = new Winreg({
-        hive: hive,
-        key: keyArr.join('\\')
-    });
-    
-    return Rx.Observable.fromNodeCallback(regKey.get.bind(regKey))(itemName)
-    .map(function (item) {
-        return item.value;
-    }).catch(Rx.Observable.just(def));
-}
-/**
  * Searches for a game in registry and returns 
  */ 
-function findGameInRegistry(name, hive, regKey, distributor) {
-    return regKeyObservable(hive, regKey, null).filter(function (value) { return value !== null; }).map(function (value) {
+function findGameInRegistry(name, regPath, distributor) {
+    var keyArr = regPath.split('\\');
+    var valueName = keyArr.splice(-1)[0];
+
+    return Platform.registryKeyObserver({
+        path: keyArr.join('\\'),
+        valueName: valueName
+    }).filter(function (value) { return value !== ""; }).map(function (value) {
         return {
             'name': name,
             'path': value,

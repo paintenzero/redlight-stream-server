@@ -23,17 +23,22 @@ var GetPin = edge.func({
     methodName: 'GetPin' // This must be Func<object,Task<object>>
 });
 module.exports.GetPin = function () {
-    return Rx.Observable.create(function (subscriber) {
-        GetPin(null, function (err, pin) {
-            if (err) {
-                subscriber.onError(err);
-            } else {
-                subscriber.onNext(pin);
-                subscriber.onCompleted();
-            }
-        });
-        return function () {
-            //
-        }
-    });
+    return Rx.Observable.fromNodeCallback(GetPin)(null);
+};
+
+
+var GetRegistryValue = edge.func({
+    assemblyFile: 'RedlightLibrary.dll',
+    typeName: 'RedlightLibrary.Server',
+    methodName: 'GetRegistryKey' // This must be Func<object,Task<object>>
+});
+/**
+ * Gets string value from Windows Registry
+ * @param Object {path: '...', 'valueName': '...', 'defaultValue': '...'}
+ */ 
+module.exports.registryKeyObserver = function (arguments) {
+    return Rx.Observable.fromNodeCallback(GetRegistryValue)(arguments);
+};
+module.exports.REGISTRY_HIVE = {
+    HKCU: 'HKEY_CURRENT_USER'
 };
