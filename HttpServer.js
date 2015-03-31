@@ -1,12 +1,15 @@
 ﻿var https = require('https');
-var CryptoManager = require('./CryptoManager.js');
+var CryptoManager = require('./CryptoManager');
 var Rx = require('rx');
 var config = require('./config');
 var logger = require('intel').getLogger('Redlight.HTTP');
 var express = require('express');
-var discoveryMan = require('./DiscoveryManager.js');
-var PinRequester = require('./PinRequester.js');
-var PairingManager = require('./PairingManager.js');
+var discoveryMan = require('./DiscoveryManager');
+//var PinRequester = require('./PinRequester');
+var Platform = require('./Platform');
+var PairingManager = require('./PairingManager');
+var GamesListManager = require('./GamesListManager');
+var builder = require('xmlbuilder');
 var storage = require('./storage');
 /**
  * Creates observable for HTTPS server
@@ -51,7 +54,8 @@ function createExpress() {
     });
     app.get('/serverinfo', serverInfo);
     app.get('/pair', pairApp);
-    app.get('/unpair', unpairApp)
+    app.get('/unpair', unpairApp);
+    app.get('/applist', appListApp);
     return app;
 }
 /**
@@ -92,7 +96,7 @@ function getServerCert(req, res, deviceId) {
     var clientcert = CryptoManager.hex2Buffer(req.query.clientcert);
     var devicename = req.query.devicename;
     
-    var subscription = PinRequester.getPin().
+    var subscription = Platform.GetPin().
     flatMap(function (pin) { // Create full key from salt + pin and save it to database
         var saltAndPin = PairingManager.createSaltAndPin(salt, pin);
         return storage.saveDevice(deviceId, devicename, clientcert, saltAndPin);
@@ -160,7 +164,7 @@ function clientPairingSecret(req, res, deviceId) {
 function pairChallenge(req, res, deviceId) {
     storage.getDevice(deviceId).
     flatMap(function (device) {
-        PairingManager.getDevicePairedStatus(deviceId)
+        return PairingManager.getDevicePairedStatus(deviceId)
     }).
     map(function (isPaired) {
         var obj = { 'paired': isPaired ? 1 : 0 };
@@ -181,17 +185,32 @@ function unpairApp(req, res) {
     }).
     subscribe(xmlRequestObserver(req, res));
 }
+
+function appListApp(req, res) {
+    var deviceId = req.query.uniqueid;
+    PairingManager.getDevicePairedStatus(deviceId).
+    map(function (paired) {
+        if (paired) {
+            return GamesListManager.GetGamesListXML(createXMLRootElement('applist', 200));
+        } else {
+            return createXMLRootElement('applist', 401, 'Not Paired');
+        }
+    }).
+    subscribe(xmlRequestObserver(req, res));
+};
+
 /**
  * Observer for sending XML to HTTP response
  */
 function xmlRequestObserver(req, res) {
     return Rx.Observer.create(
         function (xml) {
+            var xmlText = xml.end({ pretty: false });
             res.set({
                 'Content-Type': 'text/xml; charset=utf-8',
-                'Content-Length': xml.length
+                'Content-Length': xmlText.length
             });
-            res.write(xml);
+            res.write(xmlText);
         },
         function (err) {
             logger.error("Request %s error: %s", req.path, err.message, err.stack);
@@ -209,12 +228,12 @@ module.exports.httpsObservable = function () {
     return createHTTPSObservable();
 };
 
-function createXMLRootElement(query, status) {
+function createXMLRootElement(query, status, statusMessage) {
     var RootElement = {
         '@protocol_version': 0.1,
         '@query': query,
         '@status_code': status,
-        '@status_message': 'OK'
+        '@status_message': statusMessage || 'OK'
     };
-    return RootElement;
+    return builder.create({ root: RootElement }, { version: '1.0', encoding: 'UTF-16' });
 }

@@ -27,6 +27,9 @@ intel.config({
             "level": "ERROR"
         },
         "Redlight.SQLite": {
+            "level": "ERROR"
+        },
+        "Redlight.GamesList": {
         }
     }
 });

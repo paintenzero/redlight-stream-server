@@ -1,12 +1,13 @@
 ﻿var mdns = require("mdns");
 var os = require("os");
-var builder = require('xmlbuilder');
 var extend = require('extend');
 var uuid = require('uuid');
 var CryptoManager = require('./CryptoManager');
 var PairingManager = require('./PairingManager');
+var GamesListManager = require('./GamesListManager');
 var config = require('./config');
 var Rx = require('rx');
+var Platform = require('./Platform.js');
 /**
  * Class for an zeroconf advertiser
  */ 
@@ -46,10 +47,10 @@ module.exports.computerInfoXML = function (RootElement, deviceId) {
     return Rx.Observable.zip(
         CryptoManager.getServerId(),
         PairingManager.getDevicePairedStatus(deviceId),
-        function (serverId, pairedStatus) {
+        Platform.GetVideoCardName(),
+        function (serverId, pairedStatus, videocard) {
             var addr = getAddresses();
             
-            RootElement = builder.create({ root: RootElement }, { version: '1.0', encoding: 'UTF-16' });
             RootElement.ele('AuthenticationType', 1);
             RootElement.ele('ConnectionState', 1);//Unknown
             RootElement.ele('HttpsPort', 47984);
@@ -59,7 +60,7 @@ module.exports.computerInfoXML = function (RootElement, deviceId) {
             RootElement.ele('ServerCapability', config.get('gamestream.ServerCapability'));
             RootElement.ele('appversion', config.get('gamestream.appversion'));
             
-            RootElement.ele('gputype', 'Some Radeon graphics'); //TODO: detect graphics card somehow...
+            RootElement.ele('gputype', videocard); //TODO: detect graphics card somehow...
             
             RootElement.ele('hostname', os.hostname());
             if (addr.mac) {
@@ -78,7 +79,7 @@ module.exports.computerInfoXML = function (RootElement, deviceId) {
             RootElement.ele('gamelistid', 0); //Unknown
             RootElement.ele('numofapps', 0); //TODO: set
             
-            return RootElement.end({ pretty: false });
+            return RootElement;
         }
     );
 };

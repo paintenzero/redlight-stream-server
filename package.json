@@ -8,6 +8,7 @@
     "email": ""
   },
   "dependencies": {
+    "edge": "^0.10.1",
     "express": "^4.12.2",
     "extend": "^2.0.0",
     "intel": "^1.0.0",
@@ -18,6 +19,7 @@
     "sasn1": "^0.1.1",
     "sqlite3": "^3.0.5",
     "uuid": "^2.0.1",
+    "winreg": "0.0.12",
     "xmlbuilder": "^2.6.2"
   }
 }

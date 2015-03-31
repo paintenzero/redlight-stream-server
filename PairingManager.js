@@ -1,6 +1,5 @@
 ﻿var Rx = require('rx');
 var CryptoManager = require('./CryptoManager');
-var builder = require('xmlbuilder');
 var storage = require('./storage');
 var crypto = require('crypto');
 
@@ -81,7 +80,6 @@ module.exports.serverChallengeResponseXML = function (RootElement, deviceId) {
  * Creates pairing response xml
  */ 
 function createXML(RootElement, data) {
-    RootElement = builder.create({ root: RootElement }, { version: '1.0', encoding: 'UTF-16' });
     RootElement.ele('challengeresponse', data['challengeresponse'] || '');
     RootElement.ele('encodedcipher', '');
     RootElement.ele('isBusy', 0);
@@ -89,7 +87,7 @@ function createXML(RootElement, data) {
     RootElement.ele('pairingsecret', data['pairingsecret'] || '');
     RootElement.ele('plaincert', data['plaincert'] || '');
 
-    return RootElement.end({ pretty: false });
+    return RootElement;
 }
 module.exports.createXML = createXML;
 /**
