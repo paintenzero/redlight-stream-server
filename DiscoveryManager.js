@@ -77,7 +77,7 @@ module.exports.computerInfoXML = function (RootElement, deviceId) {
             
             RootElement.ele('currentgame', 0); //TODO: send game id if is running
             RootElement.ele('gamelistid', 0); //Unknown
-            RootElement.ele('numofapps', 0); //TODO: set
+            RootElement.ele('numofapps', GamesListManager.count); //TODO: set
             
             return RootElement;
         }

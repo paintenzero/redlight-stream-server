@@ -53,7 +53,7 @@ function saveDevice(deviceId, deviceName, certificate, aes) {
             return Rx.Observable.fromNodeCallback(db.run.bind(db))("UPDATE `devices` SET `name` = ?, `certificate` = ?, `key` = ? WHERE `deviceId` = ?", [deviceName, certificate, aes, deviceId]);
         } else {
             logger.debug("Inserting new device (%s, %s) to database", deviceId, deviceName);
-            return Rx.Observable.fromNodeCallback(db.run.bind(db))("INSERT INTO `devices` (`deviceId`, `name`, `certificate`, `key`, `paired`) VALUES(?, ?, ?, ?, FALSE) ", [deviceId, deviceName, certificate, aes]);
+            return Rx.Observable.fromNodeCallback(db.run.bind(db))("INSERT INTO `devices` (`deviceId`, `name`, `certificate`, `key`, `paired`) VALUES(?, ?, ?, ?, 0) ", [deviceId, deviceName, certificate, aes]);
         }
     });
 }
@@ -106,5 +106,5 @@ module.exports.updateDeviceData = function (deviceId, data) {
  * Sets status of device pairing
  */ 
 module.exports.setDevicePaired = function (deviceId, status) {
-    return Rx.Observable.fromNodeCallback(db.run.bind(db))("UPDATE `devices` SET `paired` = ? WHERE `deviceId` = ?", [status, deviceId]);
+    return Rx.Observable.fromNodeCallback(db.run.bind(db))("UPDATE `devices` SET `paired` = ? WHERE `deviceId` = ?", [status ? 1 : 0, deviceId]);
 };

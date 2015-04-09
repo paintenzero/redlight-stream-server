@@ -63,7 +63,8 @@ function createExpress() {
  */ 
 function serverInfo(req, res) {
     logger.debug('serverinfo requested');
-    discoveryMan.computerInfoXML(createXMLRootElement('serverinfo', 200)).subscribe(xmlRequestObserver(req, res));
+    var deviceId = req.query.uniqueid;
+    discoveryMan.computerInfoXML(createXMLRootElement('serverinfo', 200), deviceId).subscribe(xmlRequestObserver(req, res));
 }
 /**
  * Request to pair server with client device
@@ -142,11 +143,11 @@ function clientPairingSecret(req, res, deviceId) {
     var clientSecret = clientPairingSecret.slice(0, 16);
     var clientSecretSignature = clientPairingSecret.slice(16, 272);
     return storage.getDevice(deviceId).
-    map(function (device) {
+    flatMap(function (device) {
         return CryptoManager.verifySignature(clientSecretSignature, clientSecret, device.certificate);
     }).
     flatMap(function (checkResult) {
-        return PairingManager.setPairedStatus(deviceId, checkResult);
+        return PairingManager.setDevicePairedStatus(deviceId, checkResult);
     }).
     map(function (checkResult) {
         if (checkResult) {
@@ -210,6 +211,7 @@ function xmlRequestObserver(req, res) {
                 'Content-Type': 'text/xml; charset=utf-8',
                 'Content-Length': xmlText.length
             });
+            logger.debug("Write to HTTP client: %s", xmlText);
             res.write(xmlText);
         },
         function (err) {

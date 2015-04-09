@@ -5,10 +5,10 @@ var Rx = require('rx');
 // Initialize logger
 require('./Logger.js');
 var logger = require('intel').getLogger('Redlight');
-var GameListManager = require('./GamesListManager');
+var GamesListManager = require('./GamesListManager');
 
 
-GameListManager.init().subscribeOnCompleted(function () {
+GamesListManager.init().subscribeOnCompleted(function () {
     // Start HTTPS server
     httpSrv.httpsObservable().subscribe(Rx.Observer.create(
         function (obj) {
